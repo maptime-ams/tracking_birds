@@ -374,3 +374,11 @@ The (extremely small) p-value of this test tells is that the birds do not use th
 ## Resources to learn more
 
 If you would like to learn more about geocomputation in R this book is a great resource: https://geocompr.robinlovelace.net/index.html.
+
+Also this online course by datacamp is a nice place to start (the first part is available for free):
+https://www.datacamp.com/courses/working-with-geospatial-data-in-r
+
+For learning more about (animal) movement analysis in R, a look at the specific packages for his purpose is a good place to start:
+https://cran.r-project.org/web/packages/move/vignettes/move.pdf
+https://cran.r-project.org/web/packages/moveVis/moveVis.pdf
+https://cran.r-project.org/package=adehabitatLT/vignettes/adehabitatLT.pdf

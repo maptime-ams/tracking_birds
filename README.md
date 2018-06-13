@@ -1,2 +1,3 @@
-# tracking_birds
-Maptime #20 Tracking the secret lives of gulls
+# Maptime #20 Tracking the secret lives of gulls
+
+![gulls](gulls.jpeg)

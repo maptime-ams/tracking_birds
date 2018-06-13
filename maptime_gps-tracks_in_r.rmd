@@ -14,9 +14,9 @@ knitr::opts_chunk$set(echo = TRUE)
 In this hands-on workshop we will take a look at methods that we typically use to
 investigate animal gps-tracks. The data that is being used is coming from the research 
 location at Texel that was mentioned in the presentation. 
-Some of the material has been used a summercourse that is offered at the University of Amsterdam 
-by the Institute of Biodiversity and Ecosystem Dynamics.
-People who have contributed most to the scripts are Michael Kemp & Wouter Vansteelant.
+Some of the material has been used at a summer course that is offered at the University of Amsterdam 
+by the Institute of Biodiversity and Ecosystem Dynamics. Especially Michael Kemp and Wouter Vansteelant have 
+contributed a lot to this material.
 
 For convenience, an HTML-version of this file is available at http://horizon.science.uva.nl/public/maptime/
 

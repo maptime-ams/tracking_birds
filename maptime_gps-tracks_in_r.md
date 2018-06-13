@@ -11,28 +11,62 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
+In this hands-on workshop we will take a look at methods that we typically use to
+investigate animal gps-tracks. The data that is being used is coming from the research 
+location at Texel that was mentioned in the presentation.
 
-```{r libraries}
-library(adehabitatLT)	# to handle and manipulate GPS tracks
-library(lubridate)    # to handle time
-library(maps)				  # to display maps
-library(mapproj)			# to handle projection systems 
-library(mapdata)			# more detailed maps
-library(circular)			# to handle and plot circular data 
-library(ggmap) # to use Google Earth satellite images in R
+For convenience, an HTML-version of this file is available at http://horizon.science.uva.nl/public/maptime/
 
-source('pt2pt_fxns.R')
+In this workshop we assume that you have some working knowledge of R but are not
+necessarily very skilled in doing spatial analyses in R. For those who are more experienced
+we have a few challenges at the end of each chapter.
+
+We use functions from some libraries that are not installed by default in R.
+To ensure that you have them available you can run this command in R:
+
+```{r install_libs, eval=FALSE}
+source('http://horizon.science.uva.nl/public/maptime/install_libs.R')
 ```
+
+Before starting with the analysis we will also load two libraries:
+the plotting library `ggmap` and a small set of functions to make some calculations
+more convenient: `pt2pt_fxns.R`. 
+
+
+```{r load_libs}
+library(ggmap)        # to use Google Earth satellite images in R
+source('http://horizon.science.uva.nl/public/maptime/pt2pt_fxns.R')
+```
+
+Before we start, let's make sure that you have the required data for this workshop
+downloaded and stored in the directory which is also set as your working directory
+we need the following files:
+
+- tracking_data.csv
+- migration_data.csv
+- rGU.rda
+- tracking_data.rda
+
+To set your working directory, you can use the command `setwd('/path_to_this_file')`.
+
 
 ## Load and preprocess the data
 
-Eight Lesser black-backed gulls over the period of one month (June 2010).
+Now that we have done all the preparation, it's time to start. 
+The following command loads the data. This data file contains the movement tracks 
+of eight lesser black-backed gulls over the period of one month (June 2010).
+
 
 ```{r load_csv}
 gulls <- read.csv('tracking_data.csv')
 ```
 
-If you are using RStudio, you see in the invironment already: 66146 observations for 10 variables.
+
+If you are using RStudio, you see in the environment already some information 
+about the data just loaded. It is a data frame with 66146 observations for 10 variables.
+
+With some basic R-commands we can take a look into the structure & contents of 
+this data.
 
 ```{r explore_data_structure}
 str(gulls)
@@ -44,22 +78,33 @@ head(gulls,n=10)
 tail(gulls,n=5)
 ```
 
-```{r convert_datetime}
-gulls$date_time <- as.POSIXct(gulls$date_time, format="%Y-%m-%d %H:%M:%S", tz='UTC')
-gulls$hr <- hour(gulls$date_time)   # returns hour (0-23)
-gulls$day <- day(gulls$date_time)   # returns hour (0-23)
-
-#gulls$day <- as.numeric( format(gulls$date_time, "%d") )
-```
-
-```{r ordering}
-gulls <- gulls[order(gulls$device_info_serial,gulls$date_time),] 
-```
+The column 'device_info_serial' contains the IDs of the tracking devices, so de facto
+these are IDs for the individual birds.
+Let's check if there are indeed eight individuals in the data set. 
 
 ```{r how_many}
 ( gullun <- unique(gulls$device_info_serial) )
 ```
 
+As you can see in the summary data above, the date-time information is stored as text. 
+To work more efficiently we do need to change this into a dedicated data format. 
+In addition we might want to consider the day of the month and hour of the day as 
+additional variables.
+
+```{r convert_datetime}
+gulls$date_time <- as.POSIXct(gulls$date_time, format="%Y-%m-%d %H:%M:%S", tz='UTC')
+gulls$hr <- lubridate::hour(gulls$date_time)   # returns hour (0-23)
+gulls$day <- lubridate::day(gulls$date_time)   # returns day (0-31)
+```
+
+Possibly the data is not ordered nicely. For some analyses later-on that's
+required, so let's do this ordering already.
+
+```{r ordering}
+gulls <- gulls[order(gulls$device_info_serial,gulls$date_time),] 
+```
+
+We also take the data apart by species because it is handy for analyses later on.
 ```{r mk_subsets}
 ss.298 <- subset(gulls, gulls$device_info_serial == "298")
 ss.311 <- subset(gulls, gulls$device_info_serial == "311")
@@ -75,9 +120,9 @@ ss.355 <- subset(gulls, gulls$device_info_serial == "355")
 
 ### Basic plotting functions
 
-We use the function 'get_map()' from package ggmap to download a satellite image for Texel, and subsequently plot the gull tracks on top of it, with different colours per bird.
-
-We create the figure using the package 'ggplot2' (http://docs.ggplot2.org/current/) and related package 'ggmap' for manipulating Google Earth imagery in R. 
+We use the function `get_map()` from package ggmap to download a satellite image 
+for Texel, and subsequently plot the gull tracks on top of it, with different 
+colours per bird, using ggplot2-functions.
 
 ```{r make_maps}
 Texel <- get_map(location=c(4.7,53), zoom = 7, maptype ='satellite')		
@@ -88,7 +133,9 @@ p1 <- ggmap(Texel) + xlim(2.8,5.65)+ ylim(52.35,54) +
 p1
 ```
 
-If you are not familiar with ggplot/gmap, it is nice to explore the possibilities. It has the option to update the existing plot through extra commands. Below are some examples.
+If you are not familiar with ggplot/ggmap, it is nice to explore the possibilities. 
+It has the option to update the existing plot through extra commands. 
+Below are some examples.
 
 Specify the colour for each bird.
 
@@ -121,14 +168,14 @@ p4 + facet_wrap(~device_info_serial,ncol=4)
 ```
 
 
-
 ### Calculating and visualising additional statistics
 
 The gull data does contain a column 'speed_2d'. This is the speed measured by the GPs-tracker over a very short time-interval. While on average it gives a good estimate of the speed, it shows a large variation and does sometimes contain outliers.
 
-Another way to calculate speed is by dividing distance traveled by the time between consecutive GPS-points. We can make this calculation using the functions `pt2pt.distance()` and `pt2pt.duration()`, but have to do this per bird. We call the result 'trajectory speed'. Below this calculation is done for only three birds.
+Another way to calculate speed is by dividing distance traveled by the time between consecutive GPS-points. We can make this calculation using the functions `pt2pt.distance()` and `pt2pt.duration()`, but have to do this per bird. We call the result 'trajectory speed'. 
+This calculation is done below for three birds.
 
-```{r}
+```{r, echo=FALSE}
 ss.298$distance <- pt2pt.distance(ss.298$latitude, ss.298$longitude)
 ss.311$distance <- pt2pt.distance(ss.311$latitude, ss.311$longitude)
 ss.317$distance <- pt2pt.distance(ss.317$latitude, ss.317$longitude)
@@ -160,90 +207,111 @@ ss.311$direction <- pt2pt.direction(ss.311$latitude,ss.311$longitude)
 ss.317$direction <- pt2pt.direction(ss.317$latitude,ss.317$longitude)
 ```
 
-This stores the direction as a normal number in degrees, with North = 0 but also 360. We do however need an additional step to ensure that this direction is understood properly as a circular variable (it should be clear that directions of 0 and 180 degrees are much further apart than 0 and 270 degrees).
-
-```{r}
-ss.298$c_direction <- circular(ss.298$direction, units = 'degrees', template ='geographics')
-ss.311$c_direction <- circular(ss.311$direction, units = 'degrees', template ='geographics')
-ss.317$c_direction <- circular(ss.317$direction, units = 'degrees', template ='geographics')
-```
-
+This is an example of the result: a distribution of flight directions for bird 311.
 
 ```{r}
 hist(ss.311$direction, col='steelblue1')
 ```
 
+The values in the variable 'direction' are normal (linear) numbers in degrees, with North at 0 degrees (but also North at 360 degrees). We do need an additional step to ensure that this direction is understood properly as a circular variable (i.e. directions of 0 and 180 degrees are much further apart than 0 and 270 degrees).
+
 ```{r}
-plot.circular(ss.311$c_direction, stack=T, shrink=2, bins=90, cex=.1) ## See ?plot.circular for options
-lines(density(ss.311$c_direction, bw=35, na.rm=T), col='red', lwd=3) ## See ?lines.circular for options
-axis.circular(at=circular(seq(0, (2*pi)-(pi/2), pi/2)), labels=c("E","N","W","S")) ## See ?axis.circular for options
+ss.298$c_direction <- circular::circular(ss.298$direction, units = 'degrees', template ='geographics')
+ss.311$c_direction <- circular::circular(ss.311$direction, units = 'degrees', template ='geographics')
+ss.317$c_direction <- circular::circular(ss.317$direction, units = 'degrees', template ='geographics')
 ```
 
+Based on this, a circular histogram can be made.
 
 ```{r}
-windrose(ss.311$c_direction, log(ss.311$traj_speed), increment=.5, fill.col=topo.colors(7))
+circular::plot.circular(ss.311$c_direction, stack=T, shrink=2, bins=90, cex=.1)
+lines(density(ss.311$c_direction, bw=35, na.rm=T), col='red', lwd=3)
+circular::axis.circular(at=circular::circular(seq(0, (2*pi)-(pi/2), pi/2)), labels=c("E","N","W","S"))
+```
+
+```{r}
+circular::windrose(ss.311$c_direction, log(ss.311$traj_speed), increment=.5, fill.col=topo.colors(7))
 ```
 
 ### Challenges 
 
-1. It would be nice to combine maps and statistical graphs to make cartograms, which would for instance visualise the distribution (as in a histogram or windrose over space).
+We have only given a very brief look into ways to plot tracking data.
+And in case you already are familiar with the type of plots shown in the previous
+section you might be up for something more challenging. We provide three ideas for
+extensions.
 
-2. There are quite a few nice plotting platforms in R. Some of these contain interactivity like `leaflet`. It would be nice to explore the plotting-options using leaflet.
+1. It would be nice to combine maps and statistical graphs to make cartograms, which would for instance visualise the distribution of a variate (e.g. the speed or altitude in specific spatial region) by histograms or windroses.
+
+2. There are quite a few nice plotting platforms in R. Some of these contain interactivity like `leaflet` library. It would be nice to explore the plotting-options using leaflet.
+
 
 
 ## Explore time budgets
 
-To learn more about the behaviour and ecology of our birds, it is nice to make time-budgets. A time-budget specifies how much time a bird is spending in different habitats or on different behaviours.
+As you have seen in the presentation earlier this evening, time budgets are important to
+learn more about the behaviour and ecology of our birds. A time-budget specifies how much time a bird is spending in different habitats or on different behaviours.
 
 Here we will focus on how much time the gulls spend in different habitats during their breeding period in June. We will use a map with major geographical land-units for North-Holland with relevant units for the lesser black-backed gull. The spatial units are: Wadden Sea, North Sea, Texel, Mainland and Beach. 
+
+Let's load the data first.
 
 ```{r}
 load('./rGU.rda')   
 ```
 
-The datafile rGU contains a map (`rGU`). It is stored in a commonly used format for spatial raster data in R (a `RasterLayer`). Let's have a look wich categories this map contains.
+The datafile rGU contains a map (`rGU`) which is stored in a commonly used format for spatial raster data in R (a `RasterLayer`). Let's have a look what this map contains:
+at the very end you see the attributes listed.
 
 ```{r}
-( lbl_rGU <-levels(rGU) )
+rGU
 ```
 
 And also visualise the map.
 
-```{r}
+```{r, echo=FALSE}
 library(rasterVis)
+```
+
+```{r}
 levelplot(rGU, col.regions=c("yellow","green","blue","red","brown"))
 ```
 
 So how do we collect data from this map? First of all, this map is not in a latitude-longitude coordinate system (the GPS system is called `WGS84`) but the projected Dutch coordinate system (called `RDnew`).
 So we have to either transform the GPS-trajectory data to the Map-coordinate system or vice versa. We choose for converting the GPS data to the Map.
 
-```{r}
+```{r eval=FALSE}
 library(sp)
 library(rgdal)
-sgull <- SpatialPointsDataFrame( cbind(gulls$longitude,gulls$latitude),
+sgulls <- SpatialPointsDataFrame( cbind(gulls$longitude,gulls$latitude),
           gulls[,c('device_info_serial','date_time','altitude','speed_2d')] )
 
 # specify that this data is in WSG84 lat-lon  
-proj4string(sgull) = CRS("+init=epsg:4326")        
+proj4string(sgulls) <- CRS("+init=epsg:4326")        
   
 # transform the data to the Dutch coordinate system
-sgull = spTransform(sgull, CRS("+init=epsg:28992")) 
+sgulls <- spTransform(sgull, CRS("+init=epsg:28992")) 
 ```
+
+```{r echo=FALSE}
+load('tracking_data.rda')
+``` 
+In case the above fails (if some components of R are not installed correctly or so)
+we can also load the spatial data directly from an additional file: `load('tracking_data.rda')`.
 
 If we check the transformed data in sgull, we see that the coordinates are indeed changed from latitude longitude values into the RD-values (which range from 0 to 300000 in the West-East direction and 300000 to 600000 in the South-North direction).
 
 ```{r}
-head(sgull)
-head(coordinates(sgull))
+head(sgulls)
 ```
 
 With the data in the same coordinate system, we can record the codes of the geographical units that are visited by the gulls, using the function `extract()`
 
 ```{r}
-gulls$GU <- extract(rGU,sgull)
+gulls$GU <- extract(rGU,sgulls)
 
 # the result in gulls$GU are integers, we turn these into categories 
-gulls$GUc <- factor(gulls$GU, levels=1:5, labels=lbl_rGU[[1]]$levels)
+gulls$GUc <- factor(gulls$GU, levels=1:5, 
+                    labels= c('Beach', 'Mainland', 'North Sea', 'Texel', 'Wadden Sea') )
 ```
 
 It is good to note that any points outside the range of the map are coded as NA. 
@@ -255,7 +323,7 @@ the birds, we can simply count the number of GPS points in each geographical uni
 This is done below.
 
 ```{r}
-(bird_GU_time <- table(gulls$device_info_serial,gulls$GUc))
+( bird_GU_time <- table(gulls$device_info_serial,gulls$GUc) )
 ```
 
 This kind of table is hard to read, so let's transform it to a proportional table,
@@ -265,14 +333,16 @@ where the fractions sum to 1 per bird (the numbers are also rounded to 2 digits 
 ( bird_GU_time_pr <- round( prop.table(bird_GU_time, margin=1),2) )
 ```
 
-Follow-up steps in the analysis are often:
+Follow-up steps in the analysis are often to investigate if:
 
-- investigating whether the observed difference in habitat use between individuals are in fact large or that they are doing more or less the same;
-- investigating whether the selected has been selected is proportional to what is available.
+- the observed difference in habitat use between individuals are in fact large or that they are doing more or less the same;
+- the selected has been selected is proportional to what is available.
 
-These are statistical analyses. Here we will consider the second analysis.
-This analysis requires to first make a subjective choice of what we consider to be 
-'available' to these birds. And once that is done, a statistical test can be applied
+And have a statistical angle, because the idea is to generalize the results to the
+population (not just the few birds that were tagged). So these questions are investigated
+with statistical tools. Here we will consider the second question and show how it is commonly answered.
+
+This analysis requires to first make a subjective choice of what spatial domain we consider to be 'available' to these birds. And once that is done, a statistical test can be applied
 which compares the selected geographical units by the birds with the available 
 area in each of the units (a test for goodness of fit; we use the chi-squared test in this case).
 
@@ -285,7 +355,7 @@ selected <- table(gulls$GU)
 prop_expected <- available/sum(available)
 prop_selected <- selected/sum(selected)
 
-chisq.test(selected,p=expected)
+chisq.test(selected,p=prop_expected)
 ```
 
 The (extremely small) p-value of this test tells is that the birds do not use the landscape proportional to their availability but select for certain uses.
@@ -298,3 +368,6 @@ The (extremely small) p-value of this test tells is that the birds do not use th
 2. In spite of what we assumed, the time-steps in the data set are not homogeneous over time and also not exactly equal among individuals. We can take this problem into account by calculating the time between different points (see the function `pt2pt.duration()` fro the previous chapter) and subsequently using this information to calculate habitat use more precise.
 
 
+## Resources to learn more
+
+If you would like to learn more about geocomputation in R this book is a great resource: https://geocompr.robinlovelace.net/index.html.
